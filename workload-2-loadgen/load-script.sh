@@ -15,20 +15,15 @@ DEFAULT_CYCLE_LENGTH="${DEFAULT_CYCLE_LENGTH:-60s}"
 SCALE_FACTOR="${SCALE_FACTOR:-2}" # Multiplier for QPS and concurrency each cycle
 NUMBER_OF_CYCLES="${NUMBER_OF_CYCLES:-3}" # Total number of load steps
 WAIT_PERIOD="${WAIT_PERIOD:-5s}" # Wait period between cycles
-RUN_INTERVAL="${RUN_INTERVAL:-60s}" # Cooldown period between full test runs
 
-echo "Load generator started."
-echo "----------------------------------------"
-echo "Configuration:"
-echo "  Target URL:           ${TARGET_URL}"
-echo "  Initial QPS:          ${DEFAULT_QPS}"
-echo "  Initial Concurrency:  ${DEFAULT_CONCURRENCY}"
-echo "  Cycle Length:         ${DEFAULT_CYCLE_LENGTH}"
-echo "  Scale Factor:         ${SCALE_FACTOR}"
-echo "  Number of Cycles:     ${NUMBER_OF_CYCLES}"
-echo "  Wait Period:          ${WAIT_PERIOD}"
-echo "  Run Interval:         ${RUN_INTERVAL}"
-echo "----------------------------------------"
+echo "--------------------------------------------------------------"
+echo "Load generator started. Configuration:"
+echo "   Target URL:             ${TARGET_URL}"
+echo "   Initial Cycle:          ${DEFAULT_QPS} qps / ${DEFAULT_CONCURRENCY}" workers
+echo "   Cycle Length / Number:  ${DEFAULT_CYCLE_LENGTH} / ${NUMBER_OF_CYCLES}"
+echo "   Scale Factor:           ${SCALE_FACTOR}x"
+echo "   Wait Period:            ${WAIT_PERIOD}"
+echo "--------------------------------------------------------------"
 
 while true; do
     # Reset variables for this run
@@ -60,11 +55,6 @@ while true; do
         fi
     done
 
-    echo "----------------------------------------"
-    echo "[$(date)] All load cycles completed."
-    echo "Total Responses Processed: ${TOTAL_RESPONSES}"
-    echo "----------------------------------------"
-    
-    echo "Waiting for ${RUN_INTERVAL} before starting the next run..."
-    sleep "${RUN_INTERVAL}"
+    echo "Test cycle completed, total responses processed: ${TOTAL_RESPONSES}"
+
 done
