@@ -13,7 +13,7 @@ set -eo pipefail
 export PROJECT_ID=$(gcloud config get-value project)
 
 # GKE Cluster Configuration
-export CLUSTER_NAME="autoscaling-lab-cluster"
+export CLUSTER_NAME="autoscaling-lab"
 export REGION="us-central1"
 export MACHINE_TYPE="e2-standard-16"
 export NUM_NODES="1"
