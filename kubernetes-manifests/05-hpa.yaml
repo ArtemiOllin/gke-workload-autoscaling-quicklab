@@ -1,0 +1,25 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: workload-1-hpa
+spec:
+  # scaleTargetRef points to the deployment we want to scale.
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: workload-1-deployment
+  # minReplicas and maxReplicas define the scaling boundaries.
+  minReplicas: 1
+  maxReplicas: 5
+  # metrics defines the criteria for scaling.
+  # We will scale based on the average CPU utilization across all pods.
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      # target specifies the desired average utilization.
+      # HPA will add or remove pods to try and keep the average
+      # CPU utilization at 50% of the requested CPU.
+      target:
+        type: Utilization
+        averageUtilization: 80

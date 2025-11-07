@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workload-2-loadgen
+  labels:
+    app: workload-2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workload-2
+  template:
+    metadata:
+      labels:
+        app: workload-2
+    spec:
+      containers:
+      - name: loadgen
+        # IMPORTANT: Replace this with the path to your own image
+        # e.g., gcr.io/your-project-id/load-generator:v1.0.0
+        image: "us-central1-docker.pkg.dev/artemiollin-demo/gke-lab-repo/load-generator:v1.0.0"
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"

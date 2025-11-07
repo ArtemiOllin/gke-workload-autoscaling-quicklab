@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workload-1-deployment
+  labels:
+    app: workload-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workload-1
+  template:
+    metadata:
+      labels:
+        app: workload-1
+    spec:
+      containers:
+      - name: workload-1-app
+        # IMPORTANT: Replace this with the path to your own image
+        # e.g., gcr.io/your-project-id/cpu-intensive-app:v1.0.0
+        image: "us-central1-docker.pkg.dev/artemiollin-demo/gke-lab-repo/cpu-intensive-app:v1.0.0"
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: "4"
+            memory: "16Gi"
+          limits:
+            cpu: "4"
+            memory: "16Gi"

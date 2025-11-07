@@ -1,0 +1,20 @@
+apiVersion: "autoscaling.k8s.io/v1"
+kind: VerticalPodAutoscaler
+metadata:
+  name: workload-1-vpa
+spec:
+  # targetRef points to the deployment we want to analyze.
+  targetRef:
+    apiVersion: "apps/v1"
+    kind:       Deployment
+    name:       workload-1-deployment
+  # updateMode: "Off" means the VPA will only provide recommendations
+  # without automatically applying them. This is perfect for our analysis phase.
+  updatePolicy:
+    updateMode: "Off"
+  # resourcePolicy allows fine-tuning of VPA's recommendations.
+  # Here, we are telling it to only recommend on the 'cpu' resource.
+  resourcePolicy:
+    containerPolicies:
+    - containerName: '*' # Apply to all containers in the pod
+      controlledResources: ["cpu", "memory"]
