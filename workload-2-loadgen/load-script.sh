@@ -22,8 +22,6 @@ CURRENT_CONCURRENCY=${DEFAULT_CONCURRENCY}
 
 # Variables for aggregated results
 TOTAL_RESPONSES=0
-OVERALL_FASTEST=999999999.0 # Initialize with a very high value
-OVERALL_SLOWEST=0.0
 
 echo "Load generator started."
 echo "----------------------------------------"
@@ -46,22 +44,12 @@ for i in $(seq 1 ${NUMBER_OF_CYCLES}); do
     
     # Extract metrics from hey output
     CURRENT_QPS_ACTUAL=$(echo "${HEY_OUTPUT}" | grep "Requests/sec" | awk '{print $2}')
-    CURRENT_FASTEST=$(echo "${HEY_OUTPUT}" | grep "Fastest:" | awk '{print $2}')
-    CURRENT_SLOWEST=$(echo "${HEY_OUTPUT}" | grep "Slowest:" | awk '{print $2}')
     CURRENT_TOTAL_DURATION_SECONDS=$(echo "${HEY_OUTPUT}" | grep "Total:" | awk '{print $2}')
 
     # Calculate responses for this cycle (handle potential empty output from hey)
     if [ -n "${CURRENT_QPS_ACTUAL}" ] && [ -n "${CURRENT_TOTAL_DURATION_SECONDS}" ]; then
         CYCLE_RESPONSES=$(echo "${CURRENT_QPS_ACTUAL} * ${CURRENT_TOTAL_DURATION_SECONDS}" | bc | cut -d '.' -f 1)
         TOTAL_RESPONSES=$(echo "${TOTAL_RESPONSES} + ${CYCLE_RESPONSES}" | bc | cut -d '.' -f 1)
-    fi
-
-    # Update overall fastest and slowest
-    if [ -n "${CURRENT_FASTEST}" ]; then
-        OVERALL_FASTEST=$(echo "if (${CURRENT_FASTEST} < ${OVERALL_FASTEST}) ${CURRENT_FASTEST} else ${OVERALL_FASTEST}" | bc)
-    fi
-    if [ -n "${CURRENT_SLOWEST}" ]; then
-        OVERALL_SLOWEST=$(echo "if (${CURRENT_SLOWEST} > ${OVERALL_SLOWEST}) ${CURRENT_SLOWEST} else ${OVERALL_SLOWEST}" | bc)
     fi
 
     # Scale up for the next cycle, if not the last cycle
@@ -76,9 +64,7 @@ for i in $(seq 1 ${NUMBER_OF_CYCLES}); do
 done
 
 echo "----------------------------------------"
-echo "[$(date)] All load cycles completed. Final Summary:"
-echo "  Total Responses Processed: ${TOTAL_RESPONSES}"
-echo "  Overall Fastest Response:  ${OVERALL_FASTEST}s"
-echo "  Overall Slowest Response:  ${OVERALL_SLOWEST}s"
+echo "[$(date)] All load cycles completed."
+echo "Total Responses Processed: ${TOTAL_RESPONSES}"
 echo "----------------------------------------"
 echo "The script will now exit. The pod will restart based on the 'restartPolicy'."
