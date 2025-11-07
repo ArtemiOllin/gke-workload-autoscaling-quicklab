@@ -37,8 +37,6 @@ echo "----------------------------------------"
 
 # Loop through the specified number of cycles
 for i in $(seq 1 ${NUMBER_OF_CYCLES}); do
-    echo "[$(date)] Starting Cycle ${i}/${NUMBER_OF_CYCLES} with QPS=${CURRENT_QPS}, Concurrency=${CURRENT_CONCURRENCY} for ${DEFAULT_CYCLE_LENGTH}..."
-
     # Run hey and capture its output
     HEY_OUTPUT=$(hey -z "${DEFAULT_CYCLE_LENGTH}" -q "${CURRENT_QPS}" -c "${CURRENT_CONCURRENCY}" "${TARGET_URL}" 2>&1)
     
@@ -57,8 +55,6 @@ for i in $(seq 1 ${NUMBER_OF_CYCLES}); do
         CURRENT_QPS=$(echo "${CURRENT_QPS} * ${SCALE_FACTOR}" | bc | cut -d '.' -f 1)
         CURRENT_CONCURRENCY=$(echo "${CURRENT_CONCURRENCY} * ${SCALE_FACTOR}" | bc | cut -d '.' -f 1)
         
-        echo "[$(date)] Scaling up for next cycle: New QPS=${CURRENT_QPS}, New Concurrency=${CURRENT_CONCURRENCY}"
-        echo "[$(date)] Waiting for ${WAIT_PERIOD} before next cycle..."
         sleep "${WAIT_PERIOD}"
     fi
 done

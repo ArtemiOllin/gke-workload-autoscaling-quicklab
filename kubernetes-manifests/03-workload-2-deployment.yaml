@@ -18,7 +18,7 @@ spec:
       - name: loadgen
         # IMPORTANT: Replace this with the path to your own image
         # e.g., gcr.io/your-project-id/load-generator:v6.0.0
-        image: "us-central1-docker.pkg.dev/artemiollin-demo/gke-lab-repo/load-generator:v6.0.0"
+        image: "us-central1-docker.pkg.dev/artemiollin-demo/gke-lab-repo/load-generator:v7.0.0"
         env:
         - name: TARGET_URL
           value: "http://workload-1-svc:8080/calculate"
@@ -27,17 +27,17 @@ spec:
         - name: DEFAULT_CONCURRENCY
           value: "10"
         - name: DEFAULT_CYCLE_LENGTH
-          value: "15s"
+          value: "30s"
         - name: SCALE_FACTOR
           value: "2"
         - name: NUMBER_OF_CYCLES
-          value: "3"
+          value: "4"
         - name: WAIT_PERIOD
           value: "5s"
         resources:
           requests:
-            cpu: "250m"
-            memory: "128Mi"
-          limits:
             cpu: "500m"
             memory: "256Mi"
+          limits:
+            cpu: "1"
+            memory: "512Mi"
