@@ -7,7 +7,7 @@ Welcome! This hands-on lab demonstrates the real-world impact of resource right-
 This repository contains a complete environment to explore GKE autoscaling features. It includes:
 
 *   **Infrastructure Script:** A `setup.sh` script to provision a GKE cluster with all necessary components.
-*   **CPU-Intensive Application (`workload-1`):** A web application that performs CPU-intensive calculations. It is intentionally limited to use only **one CPU core** per replica to simulate a resource-bound service.
+*   **CPU-Intensive Application (`workload-1`):** A web application that performs CPU-intensive calculations. It is intentionally limited to use only **1 CPU core** per replica to simulate a resource-bound service.
 *   **Stepped Load Generator (`workload-2`):** An application that uses `hey` to generate a progressively increasing load against `workload-1`, allowing us to observe how the system behaves under stress.
 *   **Kubernetes Manifests:** A full set of pre-configured manifests for the applications, Vertical Pod Autoscaler (VPA), and Horizontal Pod Autoscaler (HPA).
 

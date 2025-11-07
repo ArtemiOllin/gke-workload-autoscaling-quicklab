@@ -19,10 +19,10 @@ WAIT_PERIOD="${WAIT_PERIOD:-5s}" # Wait period between cycles
 echo "--------------------------------------------------------------"
 echo "Load generator started. Configuration:"
 echo "   Target URL:             ${TARGET_URL}"
-echo "   Initial Cycle:          ${DEFAULT_QPS} qps / ${DEFAULT_CONCURRENCY}" workers
-echo "   Cycle Length / Number:  ${DEFAULT_CYCLE_LENGTH} / ${NUMBER_OF_CYCLES}"
-echo "   Scale Factor:           ${SCALE_FACTOR}x"
-echo "   Wait Period:            ${WAIT_PERIOD}"
+echo "   Initial cycle:          ${DEFAULT_QPS} qps / ${DEFAULT_CONCURRENCY}" workers
+echo "   Cycle length / number:  ${DEFAULT_CYCLE_LENGTH} / ${NUMBER_OF_CYCLES}"
+echo "   Scale factor:           ${SCALE_FACTOR}x"
+echo "   Wait period:            ${WAIT_PERIOD}"
 echo "--------------------------------------------------------------"
 
 while true; do
