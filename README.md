@@ -1,252 +1,129 @@
-# GKE Autoscaling Lab: Mastering VPA and HPA
+# GKE Autoscaling Lab: Right-Sizing and Performance Tuning
 
-Welcome! This hands-on lab is designed for Site Reliability Engineers to learn how to effectively use Vertical Pod Autoscaler (VPA) and Horizontal Pod Autoscaler (HPA) on Google Kubernetes Engine (GKE).
+Welcome! This hands-on lab demonstrates the real-world impact of resource right-sizing and autoscaling on application performance using Google Kubernetes Engine (GKE).
 
-We will simulate a common real-world scenario: a misconfigured, over-provisioned workload. We will first use VPA to find the correct resource requests ("right-sizing") and then use HPA to automatically scale the workload based on CPU demand.
+## Lab Overview
 
-**Lab Objectives:**
+This repository contains a complete environment to explore GKE autoscaling features. It includes:
 
-1.  **Provision a GKE Cluster** with VPA and Metrics Server enabled.
-2.  **Deploy a Misconfigured Workload** with excessively high CPU requests.
-3.  **Use VPA in "Recommendation Mode"** to determine the appropriate CPU and memory requests.
-4.  **Manually Apply VPA Recommendations** to right-size the workload.
-5.  **Use HPA to Horizontally Scale** the right-sized workload based on CPU utilization.
-6.  **Observe Autoscaling in Action** in response to variable traffic.
+*   **Infrastructure Script:** A `setup.sh` script to provision a GKE cluster with all necessary components.
+*   **CPU-Intensive Application (`workload-1`):** A web application that performs CPU-intensive calculations. It is intentionally limited to use only **one CPU core** per replica to simulate a resource-bound service.
+*   **Stepped Load Generator (`workload-2`):** An application that uses `hey` to generate a progressively increasing load against `workload-1`, allowing us to observe how the system behaves under stress.
+*   **Kubernetes Manifests:** A full set of pre-configured manifests for the applications, Vertical Pod Autoscaler (VPA), and Horizontal Pod Autoscaler (HPA).
 
----
-
-## Prerequisites
-
-- `gcloud` CLI installed and configured.
-- `kubectl` CLI installed.
-- `docker` installed and configured to push to a container registry.
-- A GCP project where you have permissions to create GKE clusters and Artifact Registry repositories.
+**Lab Goal:** You will deploy a misconfigured, over-provisioned application and observe its poor performance. Then, using VPA recommendations and HPA adjustments directly in the GKE UI, you will right-size the application and scale it out to dramatically improve its throughput.
 
 ---
 
-## Phase 1: Setup & Baseline Analysis
+## Step 1: Deploy the Environment
 
-In this phase, we'll set up our infrastructure, build and deploy our applications, and observe the initial "misconfigured" state.
+First, provision the GKE cluster and deploy all the lab components.
 
-### Step 1.1: Provision the GKE Cluster
+1.  **Provision the Cluster:**
+    The provided script creates a GKE Standard cluster with VPA enabled.
+    ```bash
+    # Navigate to the infrastructure directory
+    cd gke-autoscaling-lab/infrastructure
 
-First, we need our Kubernetes cluster. The provided script creates a GKE Standard cluster with VPA enabled.
+    # Make the script executable and run it
+    chmod +x setup.sh
+    ./setup.sh
+    ```
+    This command will take several minutes. Once finished, `kubectl` will be configured to point to your new cluster.
 
-```bash
-# Navigate to the infrastructure directory
-cd infrastructure
+2.  **Deploy Applications and Autoscalers:**
+    Apply all the Kubernetes manifests at once. This will deploy `workload-1`, `workload-2`, the VPA configuration, and the HPA configuration.
+    ```bash
+    # Navigate to the manifests directory from the repository root
+    cd ../kubernetes-manifests
 
-# IMPORTANT: Set your GCP Project ID in the script if it's not
-# already configured in your gcloud environment.
-# Open setup.sh and edit the PROJECT_ID variable.
-
-# Make the script executable and run it
-chmod +x setup.sh
-./setup.sh
-```
-
-This command will take several minutes to complete. Once finished, `kubectl` will be configured to point to your new cluster.
-
-### Step 1.2: Build and Push Docker Images (using Google Cloud Build)
-
-Our lab uses two custom applications. We need to build their Docker images and push them to a container registry. We will use Google Artifact Registry.
-
-First, ensure the Cloud Build API is enabled and create a repository:
-
-```bash
-# Set a variable for your project ID
-export PROJECT_ID=$(gcloud config get-value project)
-
-# Set a variable for the region (must match your cluster's region)
-export REGION="us-central1"
-
-# Enable Cloud Build API
-gcloud services enable cloudbuild.googleapis.com --project "${PROJECT_ID}"
-
-# Create the Docker repository in Artifact Registry
-gcloud artifacts repositories create gke-lab-repo \
-    --repository-format=docker \
-    --location=${REGION} \
-    --description="Docker repository for GKE autoscaling lab"
-```
-
-Now, build and push the two images using Cloud Build:
-
-```bash
-# Define image paths
-export WORKLOAD_1_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/gke-lab-repo/cpu-intensive-app:v1.0.0"
-export WORKLOAD_2_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/gke-lab-repo/load-generator:v1.0.0"
-
-# Build and push workload-1-app
-echo "Building workload-1-app with Cloud Build..."
-gcloud builds submit gke-autoscaling-lab/workload-1-app \
-    --tag ${WORKLOAD_1_IMAGE} \
-    --project "${PROJECT_ID}"
-
-# Build and push workload-2-loadgen
-echo "Building workload-2-loadgen with Cloud Build..."
-gcloud builds submit gke-autoscaling-lab/workload-2-loadgen \
-    --tag ${WORKLOAD_2_IMAGE} \
-    --project "${PROJECT_ID}"
-```
-
-### Step 1.3: Deploy the Applications
-
-Now we need to update our Kubernetes manifests to use the images we just pushed.
-
-**1. Update `01-workload-1-deployment.yaml`:**
-   Open `gke-autoscaling-lab/kubernetes-manifests/01-workload-1-deployment.yaml` and replace the placeholder `image` with the path to your `cpu-intensive-app` image (`$WORKLOAD_1_IMAGE`).
-
-**2. Update `03-workload-2-deployment.yaml`:**
-   Open `gke-autoscaling-lab/kubernetes-manifests/03-workload-2-deployment.yaml` and replace the placeholder `image` with the path to your `load-generator` image (`$WORKLOAD_2_IMAGE`).
-
-With the manifests updated, deploy all the resources:
-
-```bash
-# Navigate to the manifests directory
-cd gke-autoscaling-lab/kubernetes-manifests
-
-# Apply the initial set of manifests
-kubectl apply -f 01-workload-1-deployment.yaml
-kubectl apply -f 02-workload-1-service.yaml
-kubectl apply -f 03-workload-2-deployment.yaml
-```
-
-### Step 1.4: Observe the Misconfiguration
-
-Let's see why our setup is inefficient. We have two pods for `workload-1-deployment`, and we requested **4 CPU cores** for each. Let's check the actual usage.
-
-```bash
-# Wait for pods to be running
-kubectl get pods -w
-
-# Check the resource usage of the workload-1 pods
-# The 'top' command may take a minute to become available
-kubectl top pods -l app=workload-1
-```
-
-**Observation:**
-You will see that the CPU usage is very low (e.g., `1m` or `2m`, which is 1 or 2 millicores), but the requested CPU is `4000m` (4 cores). This is a massive waste of resources. The GKE scheduler has reserved 8 cores on your nodes for these two pods that are doing almost nothing.
+    # Apply all manifests
+    kubectl apply -f .
+    ```
 
 ---
 
-## Phase 2: Right-Sizing with VPA
+## Step 2: Observe the Initial Misconfiguration and Performance
 
-Now, we'll use VPA to get recommendations for the correct CPU and memory requests.
+Now, let's see how the inefficient, over-provisioned application behaves.
 
-### Step 2.1: Deploy VPA in Recommendation Mode
+1.  **Check CPU Waste:**
+    *   In the Google Cloud Console, navigate to **Kubernetes Engine -> Workloads**.
+    *   Click on the `workload-1-deployment`.
+    *   Go to the **Observability** tab.
+    *   In the **CPU** chart, notice that the **Requested CPU** is **4 cores**, but the actual **CPU Usage** is only around **1 core**. This is a massive waste of reserved resources, and it's preventing the HPA from working correctly.
 
-We will deploy a VPA resource that targets our `workload-1-deployment`. We'll use `updateMode: "Off"` so it only provides recommendations and doesn't change anything automatically.
+2.  **Measure Baseline Performance:**
+    The load generator (`workload-2`) runs in cycles and reports the total number of successful requests at the end of each run. Let's find this number.
+    *   Navigate back to the **Workloads** screen.
+    *   Click on `workload-2-loadgen`.
+    *   Go to the **Logs** tab.
+    *   In the "Filter" box, enter `"Total Responses Processed"`.
+    *   You will see the output from the load test. Note down the number. This is your baseline performance with the misconfigured deployment.
 
-```bash
-# Apply the VPA manifest
-kubectl apply -f 04-vpa.yaml
-```
+---
 
-### Step 2.2: Let the Load Generator Run
+## Step 3: Right-Size the Application using VPA
 
-The VPA needs to see the application under load to make good recommendations. The load generator we deployed in Phase 1 is already running, creating waves of traffic. Let it run for at least 5-10 minutes to allow VPA to collect sufficient data.
+Let's use the VPA's recommendation to fix our CPU request.
 
-### Step 2.3: Inspect VPA Recommendations
+1.  **Find the VPA Recommendation:**
+    *   In the GKE navigation menu, go to **Workloads -> Vertical Pod Autoscalers**.
+    *   Click on `workload-1-vpa`.
+    *   Observe the **Recommended CPU** in the summary panel. It will be close to **1 core**, confirming our observation.
 
-After a few minutes, we can inspect the VPA object to see its recommendations.
-
-```bash
-# Describe the VPA object
-kubectl describe vpa workload-1-vpa
-```
-
-Look for the `Recommendation` section in the output. It will look something like this:
-
-```
-Recommendation:
-  Container Recommendations:
-    Container Name:  workload-1-app
-    Lower Bound:
-      Cpu:     25m
-      Memory:  262144k
-    Target:
-      Cpu:     850m
-      Memory:  262144k
-    Uncapped Target:
-      Cpu:     850m
-      Memory:  262144k
-    Upper Bound:
-      Cpu:     20
-      Memory:  512Mi
-```
-
-**Analysis:**
-- **`Target`**: This is the VPA's primary recommendation. In this example, it suggests we should be requesting `850m` CPU, not the `4000m` we originally set!
-- **`Lower Bound` / `Upper Bound`**: These provide a safe range for resource requests.
-
-### Step 2.4: Apply the VPA Recommendation
-
-Now we will manually update our deployment to use the `Target` recommendation.
-
-1.  **Open `01-workload-1-deployment.yaml`**.
-2.  **Find the `resources.requests` section.**
-3.  **Change `cpu` from `"4"` to the value recommended by the VPA `Target` (e.g., `"850m"`).**
-4.  **Let's also update the memory to match the recommendation (e.g., `"256Mi"`).**
-
-Your new resource block should look like this:
-
-```yaml
+2.  **Apply the Recommendation:**
+    *   Navigate back to **Workloads -> `workload-1-deployment`**.
+    *   Click **Edit**.
+    *   Switch to the **YAML** tab.
+    *   Find the `resources` section for the `workload-1-app` container.
+    *   For simplicity, change both `requests` and `limits` to the following:
+        ```yaml
         resources:
           requests:
-            cpu: "850m" # <-- Updated from "4"
-            memory: "256Mi"
+            cpu: "1"
+            memory: "2Gi"
           limits:
-            # It's good practice to set limits higher than requests
-            cpu: "1500m"
-            memory: "512Mi"
-```
-
-Apply the change:
-
-```bash
-kubectl apply -f 01-workload-1-deployment.yaml
-```
-
-The deployment will perform a rolling update. We have now successfully **right-sized** our application!
+            cpu: "1"
+            memory: "2Gi"
+        ```
+    *   Click **Save**. GKE will trigger a rolling update of your deployment with the corrected resource requests.
 
 ---
 
-## Phase 3: Scaling with HPA
+## Step 4: Observe HPA Actuation and Performance Improvement
 
-Our application is now efficiently configured, but it can't handle traffic spikes. We'll now add an HPA to automatically scale the number of pods based on CPU load.
+With the resource request corrected, the HPA can now accurately measure CPU utilization as a percentage and begin to scale the application.
 
-### Step 3.1: Deploy the HPA
+1.  **Watch the HPA Scale:**
+    *   Wait for the `workload-1-deployment` to finish its rolling update.
+    *   Observe the deployment's details page. You will see the number of running pods increase from 1 up to the HPA's maximum of 5 as the load generator runs.
 
-The HPA is configured to maintain an average CPU utilization of 50% across all pods. If the average CPU load goes above 50% of the *requested* CPU, the HPA will add more pods.
+2.  **Check for Performance Improvement:**
+    *   Go back to the logs for the `workload-2-loadgen` workload.
+    *   Filter again for `"Total Responses Processed"`.
+    *   Note the new number of processed responses. It should be significantly higher than your baseline, demonstrating the power of horizontal scaling.
 
-```bash
-# Apply the HPA manifest
-kubectl apply -f 05-hpa.yaml
-```
+---
 
-### Step 3.2: Observe the HPA in Action
+## Step 5: Unleash the HPA for Maximum Performance
 
-Let's watch the HPA as our load generator continues its traffic waves.
+Our application is now efficient, but the HPA is limited to only 5 replicas. Let's increase that limit to see how much performance we can really get.
 
-```bash
-# Watch the HPA status
-kubectl get hpa -w
-```
+1.  **Increase HPA `maxReplicas`:**
+    *   In the GKE navigation menu, go to **Workloads -> Horizontal Pod Autoscalers**.
+    *   Click on `workload-1-hpa`.
+    *   Click **Edit**.
+    *   Switch to the **YAML** tab.
+    *   Change `maxReplicas` from `5` to `20`.
+    *   Click **Save**.
 
-You will see the HPA's status change over a few minutes:
+2.  **Measure Final Performance:**
+    *   The load generator will start a new test run automatically.
+    *   Go back to the logs for `workload-2-loadgen` one last time and filter for `"Total Responses Processed"`.
+    *   Observe the final number. You should see another dramatic improvement in the number of total requests the application can handle.
 
-1.  **During a heavy traffic wave:** The CPU utilization will spike. You'll see the `TARGETS` column go above `50%` (e.g., `350%/50%`). In response, the HPA will increase the number of `REPLICAS`.
-
-2.  **During a light traffic wave:** The CPU utilization will drop. The `TARGETS` will fall below `50%`. The HPA will then scale the `REPLICAS` back down to the minimum.
-
-You can also watch the pods being created and terminated in another terminal:
-
-```bash
-kubectl get pods -l app=workload-1 -w
-```
-
-**Congratulations!** You have successfully used VPA to right-size a workload and HPA to automatically scale it based on real-time demand.
+**Congratulations!** You have successfully diagnosed a misconfigured application, used VPA recommendations to right-size it, and configured HPA to scale it for significantly improved performance.
 
 ---
 
@@ -255,13 +132,9 @@ kubectl get pods -l app=workload-1 -w
 To avoid incurring ongoing charges, delete the resources you created.
 
 ```bash
-# Delete the GKE cluster
-gcloud container clusters delete ${CLUSTER_NAME} --region ${REGION} --quiet
+# Navigate to the infrastructure directory
+cd gke-autoscaling-lab/infrastructure
 
-# Delete the Artifact Registry repository
-gcloud artifacts repositories delete gke-lab-repo --location=${REGION} --quiet
-```
-
-You may also want to delete the Docker images from your local machine.
-
+# Run the cleanup portion of the script
+./setup.sh cleanup
 ```

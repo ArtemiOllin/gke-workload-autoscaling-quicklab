@@ -17,47 +17,75 @@ export CLUSTER_NAME="autoscaling-lab"
 export REGION="us-central1"
 export MACHINE_TYPE="e2-standard-16"
 export NUM_NODES="1"
+export AR_REPO_NAME="gke-lab-repo"
 
 # ##################################################################
 # SCRIPT LOGIC
 # ##################################################################
 
-echo "----------------------------------------------------"
-echo "Starting GKE Cluster Provisioning..."
-echo "Project:       ${PROJECT_ID}"
-echo "Cluster Name:  ${CLUSTER_NAME}"
-echo "Region:        ${REGION}"
-echo "----------------------------------------------------"
+function setup() {
+    echo "----------------------------------------------------"
+    echo "Starting GKE Cluster Provisioning..."
+    echo "Project:       ${PROJECT_ID}"
+    echo "Cluster Name:  ${CLUSTER_NAME}"
+    echo "Region:        ${REGION}"
+    echo "----------------------------------------------------"
 
-# Enable necessary APIs
-echo "Enabling required GCP APIs..."
-gcloud services enable \
-    container.googleapis.com \
-    artifactregistry.googleapis.com --project "${PROJECT_ID}"
+    # Enable necessary APIs
+    echo "Enabling required GCP APIs..."
+    gcloud services enable \
+        container.googleapis.com \
+        artifactregistry.googleapis.com --project "${PROJECT_ID}"
 
-# Create the GKE cluster
-echo "Creating GKE Standard cluster '${CLUSTER_NAME}'..."
-echo "This will take several minutes..."
+    # Create the GKE cluster
+    echo "Creating GKE Standard cluster '${CLUSTER_NAME}'..."
+    echo "This will take several minutes..."
 
-gcloud container clusters create "${CLUSTER_NAME}" \
-    --project "${PROJECT_ID}" \
-    --region "${REGION}" \
-    --machine-type "${MACHINE_TYPE}" \
-    --num-nodes "${NUM_NODES}" \
-    --enable-vertical-pod-autoscaling \
-    --no-enable-autoupgrade \
-    --cluster-version=latest
+    gcloud container clusters create "${CLUSTER_NAME}" \
+        --project "${PROJECT_ID}" \
+        --region "${REGION}" \
+        --machine-type "${MACHINE_TYPE}" \
+        --num-nodes "${NUM_NODES}" \
+        --enable-vertical-pod-autoscaling \
+        --no-enable-autoupgrade \
+        --cluster-version=latest
 
-echo "✅ GKE Cluster '${CLUSTER_NAME}' created successfully."
-echo "----------------------------------------------------"
+    echo "✅ GKE Cluster '${CLUSTER_NAME}' created successfully."
+    echo "----------------------------------------------------"
 
-# Configure kubectl
-echo "Configuring kubectl to connect to the new cluster..."
-gcloud container clusters get-credentials "${CLUSTER_NAME}" --region "${REGION}" --project "${PROJECT_ID}"
+    # Configure kubectl
+    echo "Configuring kubectl to connect to the new cluster..."
+    gcloud container clusters get-credentials "${CLUSTER_NAME}" --region "${REGION}" --project "${PROJECT_ID}"
 
-echo "✅ kubectl is configured."
-echo "----------------------------------------------------"
+    echo "✅ kubectl is configured."
+    echo "----------------------------------------------------"
 
 
-echo "Lab infrastructure setup is complete!"
-echo "----------------------------------------------------"
+    echo "Lab infrastructure setup is complete!"
+    echo "----------------------------------------------------"
+}
+
+function cleanup() {
+    echo "----------------------------------------------------"
+    echo "Starting Lab Cleanup..."
+    echo "Project:       ${PROJECT_ID}"
+    echo "Cluster Name:  ${CLUSTER_NAME}"
+    echo "Region:        ${REGION}"
+    echo "----------------------------------------------------"
+
+    echo "Deleting GKE cluster '${CLUSTER_NAME}'..."
+    gcloud container clusters delete "${CLUSTER_NAME}" --region "${REGION}" --project "${PROJECT_ID}" --quiet
+
+    echo "Deleting Artifact Registry repository '${AR_REPO_NAME}'..."
+    gcloud artifacts repositories delete "${AR_REPO_NAME}" --location="${REGION}" --project="${PROJECT_ID}" --quiet
+
+    echo "✅ Lab cleanup is complete."
+    echo "----------------------------------------------------"
+}
+
+# Main script execution
+if [ "$1" == "cleanup" ]; then
+    cleanup
+else
+    setup
+fi
