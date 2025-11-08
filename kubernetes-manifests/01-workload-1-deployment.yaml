@@ -18,7 +18,7 @@ spec:
       - name: workload-1-app
         # IMPORTANT: Replace this with the path to your own image
         # e.g., gcr.io/your-project-id/cpu-intensive-app:v1.0.0
-        image: "us-central1-docker.pkg.dev/artemiollin-demo/gke-lab-repo/cpu-intensive-app:v2.0.0"
+        image: "us-central1-docker.pkg.dev/artemiollin-demo/gke-lab-repo/cpu-intensive-app:v14.0.0"
         ports:
         - containerPort: 8080
         env:
